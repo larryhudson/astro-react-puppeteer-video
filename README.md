@@ -1,10 +1,11 @@
 ## To do list
 
-- Rather than having 'start' and 'end', what about just duration? And then we work out what the current slide is based on the current time
+- [x] Rather than having 'start' and 'end', what about just duration? And then we work out what the current slide is based on the current time
 - Thinking about slide animations - fade in and fade out
-- Animations within a slide shouldn't be dependent on the 'global video time' - they should be dependent on the slide time
+- [x] Animations within a slide shouldn't be dependent on the 'global video time' - they should be dependent on the slide time
 - Need a way of telling Puppeteer that the map slide is ready for action
 - Need a way of telling Puppeteer that the frame content has not changed, so use the same screenshot as the last frame. Some concept of 'clean' and 'dirty'
+- MDX slides? Write content as Markdown?
 
 
 # Astro Starter Kit: Minimal

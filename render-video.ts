@@ -10,7 +10,7 @@ async function main() {
   const videoOutputPath = "output.mp4";
 
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: false,
     defaultViewport: {
       width: videoWidth,
       height: videoHeight,
@@ -24,7 +24,7 @@ async function main() {
   // await browserPage.waitForSelector("#map-is-ready");
 
   let currentTimeSecs = 0;
-  const framesPerSecond = 5;
+  const framesPerSecond = 30;
   const secondsPerFrame = 1.0 / framesPerSecond;
 
   // get the duration of the video from the '#video-duration' element
@@ -33,7 +33,7 @@ async function main() {
   // })
 
   // TODO: get this from the webpage
-  const videoDurationSecs = 15;
+  const videoDurationSecs = 1;
 
   const imagesStream = new stream.PassThrough();
 
@@ -74,28 +74,28 @@ async function main() {
 
     // check if there is a div element with the id 'use-previous'
 
-    const isClean = await browserPage.evaluate(() => {
-      return !document
-        .getElementById("video-wrapper")
-        ?.classList.contains("dirty");
+    // const isClean = await browserPage.evaluate(() => {
+    //   return !document
+    //     .getElementById("video-wrapper")
+    //     ?.classList.contains("dirty");
+    // });
+
+    // console.log({isClean})
+
+    // if (isClean && previousScreenshot) {
+    //     console.log("using previous")
+    //   imagesStream.write(previousScreenshot);
+    // } else {
+    const screenshot = await browserPage.screenshot({
+      type: "png",
     });
+    imagesStream.write(screenshot);
+    // previousScreenshot = screenshot;
 
-    console.log({isClean})
-
-    if (isClean && previousScreenshot) {
-        console.log("using previous")
-      imagesStream.write(previousScreenshot);
-    } else {
-      const screenshot = await browserPage.screenshot({
-        type: "png",
-      });
-      imagesStream.write(screenshot);
-      previousScreenshot = screenshot;
-
-      await browserPage.evaluate(() => {
-        document.dispatchEvent(new CustomEvent("setClean"));
-      });
-    }
+    // await browserPage.evaluate(() => {
+    //   document.dispatchEvent(new CustomEvent("setClean"));
+    // });
+    // }
 
     currentTimeSecs += secondsPerFrame;
   }
