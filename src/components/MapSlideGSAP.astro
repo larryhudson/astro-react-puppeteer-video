@@ -1,0 +1,228 @@
+---
+
+---
+
+<div>
+  <div id="map"></div>
+  <form id="jump-to-form">
+    <input
+      step="0.01"
+      type="number"
+      id="jump-to-time"
+      placeholder="Jump to time"
+    />
+    <button>Jump</button>
+  </form>
+  <button id="play-button">Play</button>
+</div>
+
+<script>
+  import gsap from "gsap";
+  import { Map } from "maplibre-gl";
+  import mapStyle from "@src/map-style.json";
+  import { layersWithoutLabels, layersWithLabels } from "@src/protomaps-style";
+
+  console.log({ mapStyle });
+
+  const moulinRougeCoords = {
+    lng: 2.3323304193390584,
+    lat: 48.88414105515227,
+  };
+
+  const eiffelTowerCoords = {
+    lng: 2.2944952484112946,
+    lat: 48.85836123686562,
+  };
+
+  const mapLibreMapStyle = {
+    version: 8,
+    glyphs:
+      "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
+    sources: {
+      "protomaps-mvt": {
+        type: "vector",
+        tiles: [
+          "https://pmtiles.larryhudson.net/paris-v2-20240217/{z}/{x}/{y}.mvt",
+        ],
+        maxzoom: 15,
+        attribution:
+          '<a href="https://protomaps.com">Protomaps</a> © <a href="https://openstreetmap.org">OpenStreetMap</a>',
+      },
+    },
+    //  one of light, dark, white, black, grayscale or debug.
+    layers: layersWithLabels,
+  };
+
+  const timeline = gsap.timeline({ paused: true });
+
+  const mapState = {
+    zoom: 17,
+    centerLat: moulinRougeCoords.lat,
+    centerLng: moulinRougeCoords.lng,
+  };
+
+  const mapElement = document.querySelector("#map");
+
+  const map = new Map({
+    container: "map",
+    style: mapLibreMapStyle,
+    center: [mapState.centerLng, mapState.centerLat],
+    zoom: mapState.zoom,
+  });
+
+  // create a map marker for the moulin rouge
+
+  function updateMapState() {
+    map.setCenter([mapState.centerLng, mapState.centerLat]);
+    map.setZoom(mapState.zoom);
+  }
+
+  function calculateMetresBetweenPoints(start, end) {
+    console.log({
+      startLat: start.lat,
+      startLng: start.lng,
+      endLat: end.lat,
+      endLng: end.lng,
+    });
+
+    const earthRadius = 6371000;
+    const lat1 = (Math.PI * start[1]) / 180;
+    const lat2 = (Math.PI * end[1]) / 180;
+    const lng1 = (Math.PI * start[0]) / 180;
+    const lng2 = (Math.PI * end[0]) / 180;
+    const dLat = lat2 - lat1;
+    const dLng = lng2 - lng1;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  map.on("click", (e) => {
+    console.log(e.lngLat);
+  });
+
+  map.on("idle", () => {
+    mapElement.classList.add("map-idle");
+  });
+
+  const jumpToForm = document.querySelector("#jump-to-form");
+  jumpToForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    console.log("Doing the thing");
+    const timeStr = document.querySelector("#jump-to-time").value;
+    const time = parseFloat(timeStr);
+    timeline.seek(time, false);
+  });
+
+  const playButton = document.querySelector("#play-button");
+  playButton.addEventListener("click", () => {
+    timeline.play();
+  });
+
+  async function fetchWalkingDirections(start, end) {
+    console.log({ start, end });
+    // use the osrm api to get walking directions
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?geometries=geojson`;
+    const osrmResponse = await fetch(osrmUrl);
+
+    const osrmData = await osrmResponse.json();
+    const route = osrmData.routes[0];
+    const line = route.geometry;
+    const currentLineState = {
+      lat: start.lat,
+      lng: start.lng,
+    };
+
+    const routeTimeline = gsap.timeline({ paused: false });
+    for (const [coordIndex, coord] of line.coordinates.entries()) {
+      console.log({ coordIndex, coord });
+      const previousPoint = line.coordinates[coordIndex - 1] || [
+        start.lng,
+        start.lat,
+      ];
+
+      const distanceMetres = calculateMetresBetweenPoints(previousPoint, coord);
+      const duration = distanceMetres / 50;
+
+      routeTimeline.to(currentLineState, {
+        duration,
+        lat: coord[1],
+        lng: coord[0],
+        onUpdate: () => {
+          drawLineTo(line.coordinates, coord[0], coord[1]);
+          map.setCenter([currentLineState.lng, currentLineState.lat]);
+        },
+      });
+    }
+
+    timeline.add(routeTimeline);
+    window.totalDuration = timeline.totalDuration();
+
+    let drawnCoords = [];
+
+    function drawLineTo(coordsArray, coordLng, coordLat) {
+      const isFinished =
+        currentLineState.lng === coordLng && currentLineState.lat === coordLat;
+      if (isFinished) {
+        drawnCoords.push([coordLng, coordLat]);
+        return;
+      }
+      const newLine = {
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            ...drawnCoords,
+            [currentLineState.lng, currentLineState.lat],
+          ],
+        },
+      };
+      map.getSource("route").setData(newLine);
+    }
+
+    // add the line to the map
+    map.addSource("route", {
+      type: "geojson",
+      data: {
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "LineString",
+          coordinates: line.coordinates,
+        },
+      },
+    });
+
+    map.addLayer({
+      id: "route",
+      type: "line",
+      source: "route",
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#888",
+        "line-width": 8,
+      },
+    });
+
+    console.log({ osrmData });
+  }
+
+  fetchWalkingDirections(moulinRougeCoords, eiffelTowerCoords);
+
+  document.addEventListener("goToTime", (event) => {
+    timeline.seek(event.detail.time, false);
+  });
+</script>
+
+<style>
+  #map {
+    width: 800px;
+    height: 600px;
+  }
+</style>

@@ -31,9 +31,14 @@ async function main() {
   // const videoDurationSecs = await browserPage.evaluate(() => {
   //     return Number(document.querySelector("#video-duration").getAttribute("data-duration"));
   // })
+  await browserPage.waitForSelector(".map-idle");
 
   // TODO: get this from the webpage
-  const videoDurationSecs = 1;
+  const videoDurationSecs = await browserPage.evaluate(() => {
+    return window.totalDuration;
+  })
+
+  console.log({ videoDurationSecs });
 
   const imagesStream = new stream.PassThrough();
 
@@ -70,7 +75,7 @@ async function main() {
       document.dispatchEvent(frameEvent);
     }, currentTimeSecs);
 
-    await browserPage.waitForSelector("#slide-ready");
+    await browserPage.waitForSelector(".map-idle");
 
     // check if there is a div element with the id 'use-previous'
 

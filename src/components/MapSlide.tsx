@@ -121,11 +121,11 @@ export default function MapSlide({
 
   React.useEffect(() => {
     if (currentTimeSecs > totalDurationSecs) {
-        return;
+      return;
     }
 
     if (currentTimeSecs < 0) {
-        return;
+      return;
     }
 
     const currentAnimation = getCurrentTiming(moveAnimations, currentTimeSecs);
